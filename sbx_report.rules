@@ -1,0 +1,9 @@
+rule final_report:
+    input:
+        fastqc=str(QC_FP/'reports'/'fastqc_quality.tsv'),
+        decontam=str(QC_FP/'reports'/'preprocess_summary.tsv'),
+        classify=str(CLASSIFY_FP/'kraken'/'all_samples.tsv')
+    output:
+        str(Cfg['all']['output_fp']/'reports/final_report.html')
+    script:
+        sunbeam_dir + '/extensions/sbx_report/final_report.Rmd'

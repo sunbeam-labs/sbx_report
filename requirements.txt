@@ -1,0 +1,3 @@
+r-tidyverse
+r-rmarkdown
+r-viridis
