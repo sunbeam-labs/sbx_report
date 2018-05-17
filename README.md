@@ -23,4 +23,4 @@ A self-contained HTML file is generated in your specified output folder under 'r
 
 ## Example
 
-Click [here](example.html) for an example report.
+Click [here](https://rawgit.com/sunbeam-labs/sbx_report/master/example.html) for an example report.
