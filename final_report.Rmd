@@ -174,6 +174,19 @@ make_square <- function(p, fudge=1) {
   dims <- heatmap_dims(p)
   p + ggplot2::theme(aspect.ratio = (dims$nrows/dims$ncols)*fudge)
 }
+
+#' Filter taxon for a ggplot2 heatmap.
+#' 
+filter_taxon <- function(hmapData, threshold = 100){
+  hmapData %>% 
+    group_by(MinRank) %>% 
+    summarise(maxCount = max(count)) %>% 
+    filter(maxCount >=threshold) %>% 
+    ungroup() %>% 
+    .$MinRank %>% 
+    droplevels() %>% 
+    as.character()
+}
 ```
 
 
@@ -276,14 +289,7 @@ agg <- ParseOTUTable(classify_report) %>%
   mutate(SampleID = str_replace(SampleID, '^X', '')) %>%
   mutate(SampleID = str_replace(SampleID, '.taxa$', ''))
 phyla.hmap.dat <- MakeHeatmapData(agg, yaxis="Phylum", min.samples = max(1, n_samples*0.2))
-phyla.to.keep <- phyla.hmap.dat %>% 
-  group_by(MinRank) %>% 
-  summarise(maxCount = max(count)) %>% 
-  filter(maxCount >=100) %>% 
-  ungroup() %>% 
-  .$MinRank %>% 
-  droplevels() %>% 
-  as.character()
+phyla.to.keep <- filter_taxon(phyla.hmap.dat)
 phyla.hmap <- ggplot(phyla.hmap.dat %>% filter(MinRank %in% phyla.to.keep), aes(SampleID, MinRank, fill=log10(count))) +
   geom_tile(color="grey80", size=0.4) +
   viridis::scale_fill_viridis(na.value="white", option = "A", labels=function(x) 10^(as.numeric(x))) +
@@ -304,8 +310,30 @@ phyla.dims <- eval(heatmap_dims(phyla.hmap))
 p.height <- max(1.5+0.1*phyla.dims$nrows, 5)
 p.width <- max(2.5+0.2*phyla.dims$ncols, 5)
 test <- 5
+
+family.hmap.dat <- MakeHeatmapData(agg, yaxis="Family", min.samples = max(1, n_samples*0.2))
+family.to.keep <- filter_taxon(family.hmap.dat)
+family.hmap <- ggplot(family.hmap.dat %>% filter(MinRank %in% family.to.keep), aes(SampleID, MinRank, fill=log10(count))) +
+  geom_tile(color="grey80", size=0.4) +
+  viridis::scale_fill_viridis(na.value="white", option = "A", labels=function(x) 10^(as.numeric(x))) +
+  theme_classic() +
+  theme(
+    axis.line = element_blank(),
+    panel.border = element_blank(),
+    axis.text.x = element_text(angle=90, hjust=1, vjust=0.5),
+    axis.title.x = element_blank(),
+    plot.title = element_text(hjust = 0.5)
+  ) +
+  labs(
+    title="Family (or higher) level abundances",
+    y="Resolved taxonomic rank",
+    fill="Read counts"
+  )
+family.dims <- heatmap_dims(family.hmap)
+
 genera.hmap.dat <- MakeHeatmapData(agg, yaxis="Genus", min.samples = max(1, n_samples*0.2))
-genera.hmap <- ggplot(genera.hmap.dat, aes(SampleID, MinRank, fill=log10(count))) +
+genera.to.keep <- filter_taxon(genera.hmap.dat, 50)
+genera.hmap <- ggplot(genera.hmap.dat %>% filter(MinRank %in% genera.to.keep), aes(SampleID, MinRank, fill=log10(count))) +
   geom_tile(color="grey80", size=0.4) +
   viridis::scale_fill_viridis(na.value="white", option = "A", labels=function(x) 10^(as.numeric(x))) +
   theme_classic() +
@@ -322,7 +350,8 @@ genera.hmap <- ggplot(genera.hmap.dat, aes(SampleID, MinRank, fill=log10(count))
   )
 genera.dims <- heatmap_dims(genera.hmap)
 species.hmap.dat <- MakeHeatmapData(agg, yaxis="Species", min.samples=0)
-species.hmap <- ggplot(species.hmap.dat, aes(SampleID, MinRank, fill=log10(count))) +
+species.to.keep <- filter_taxon(species.hmap.dat, 50)
+species.hmap <- ggplot(species.hmap.dat %>% filter(MinRank %in% species.to.keep), aes(SampleID, MinRank, fill=log10(count))) +
   geom_tile(color="grey80", size=0.4) +
   viridis::scale_fill_viridis(na.value="white", option = "A", labels=function(x) 10^(as.numeric(x))) +
   theme_classic() +
@@ -354,6 +383,19 @@ if (nrow(phyla.hmap.dat) > 0) {
   cat("**No phyla present in requisite number of samples**")
 }
 
+```
+
+## Family-level heatmap
+
+Showing taxa at the family level or higher that appear in at least `r max(1, n_samples*0.2)` samples.
+
+```{r family-heatmap, fig.height=1.5+0.1*family.dims$nrows, fig.width=2.5+0.2*family.dims$ncols, results='asis'}
+save.image(file="debug.RData")
+if (nrow(family.hmap.dat) > 0) {
+  plot(make_square(family.hmap))  
+} else {
+  cat("**No phyla present in requisite number of samples**")
+}
 ```
 
 ## Genus-level heatmap
