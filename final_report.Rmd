@@ -276,7 +276,15 @@ agg <- ParseOTUTable(classify_report) %>%
   mutate(SampleID = str_replace(SampleID, '^X', '')) %>%
   mutate(SampleID = str_replace(SampleID, '.taxa$', ''))
 phyla.hmap.dat <- MakeHeatmapData(agg, yaxis="Phylum", min.samples = max(1, n_samples*0.2))
-phyla.hmap <- ggplot(phyla.hmap.dat, aes(SampleID, MinRank, fill=log10(count))) +
+phyla.to.keep <- phyla.hmap.dat %>% 
+  group_by(MinRank) %>% 
+  summarise(maxCount = max(count)) %>% 
+  filter(maxCount >=100) %>% 
+  ungroup() %>% 
+  .$MinRank %>% 
+  droplevels() %>% 
+  as.character()
+phyla.hmap <- ggplot(phyla.hmap.dat %>% filter(MinRank %in% phyla.to.keep), aes(SampleID, MinRank, fill=log10(count))) +
   geom_tile(color="grey80", size=0.4) +
   viridis::scale_fill_viridis(na.value="white", option = "A", labels=function(x) 10^(as.numeric(x))) +
   theme_classic() +
