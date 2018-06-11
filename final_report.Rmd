@@ -268,11 +268,11 @@ ggplot(preprocess, aes(y=value, x=Samples, fill=metric)) +
   coord_flip() +
   scale_y_continuous(expand=c(0,0), labels=scales::percent) +
   scale_fill_manual("",
-    labels=c("Host/Contaminant", "Low Quality", "Retained"),
+    labels=c("Host", "Low Quality", "Retained"),
     values=c("grey60", "grey80", "#029ae5ff")) +
   theme_classic() +
   labs(
-    title="Contaminant/low-quality read percentage",
+    title="Host/low-quality read percentage",
     x="Sample", 
     y="Percentage of reads")
 ```

@@ -4,7 +4,7 @@ This is an extension to generate a visual report from outputs from the [Sunbeam 
 
 ## Installing
 
-Installing an extension is as simple as cloning (or moving) your extension directory into the sunbeam/extensions/ folder, installing requirements through Conda, and adding the new options to your existing configuration file: 
+Installing an extension is as simple as cloning (or moving) your extension directory into the sunbeam/extensions/ folder, installing requirements through Conda, and adding the new options to your existing configuration file (running `source activate sunbeam` to enter the sunbeam conda environment beforehand if necessary):
 
 ```sh
 git clone https://github.com/sunbeam-labs/sbx_report sunbeam/extensions/sbx_report
