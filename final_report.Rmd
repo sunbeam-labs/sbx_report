@@ -145,22 +145,6 @@ MakeHeatmapData <- function(agg, yaxis.rank="Genus", min.samples=1,
     ungroup()
 }
 
-#' Find the dimensions of a ggplot2 heatmap.
-#'
-#' This works by identifying the number of unique points in the variables mapped
-#' to the x and y axes.
-#'
-#' @param p a ggplot2 heatmap (or any ggplot with x and y mappings)
-#' @return a list with the number of rows and columns
-#' @export
-heatmap_dims <- function(p) {
-  .x <- as.character(p$mapping$x)
-  .y <- as.character(p$mapping$y)
-  ncols <- length(unique(p$data[[.x]]))
-  nrows <- length(unique(p$data[[.y]]))
-  return(list(ncols=ncols, nrows=nrows))
-}
-
 #' Uses the number of columns and number of rows in a heatmap to fix the
 #' aspect ratio such that the cells are perfectly square.
 #'
@@ -170,22 +154,18 @@ heatmap_dims <- function(p) {
 #' @return the same object, with the aspect ratio fixed to be the (number of
 #' rows)/(number of columns)
 #' @export
-make_square <- function(p, fudge=1) {
-  dims <- heatmap_dims(p)
-  p + ggplot2::theme(aspect.ratio = (dims$nrows/dims$ncols)*fudge)
+make_square <- function(p, p_dims, fudge=1) {
+  p + ggplot2::theme(aspect.ratio = (p_dims$nrows / p_dims$ncols) * fudge)
 }
 
 #' Filter taxon for a ggplot2 heatmap.
-#' 
+#' @return The data frame with taxa removed.
 filter_taxon <- function(hmapData, threshold = 100){
   hmapData %>% 
     group_by(MinRank) %>% 
-    summarise(maxCount = max(count)) %>% 
-    filter(maxCount >=threshold) %>% 
+    filter(max(count) >= threshold) %>%
     ungroup() %>% 
-    .$MinRank %>% 
-    droplevels() %>% 
-    as.character()
+    mutate(MinRank = fct_drop(MinRank))
 }
 ```
 
@@ -288,9 +268,10 @@ classify_report <- file.path(snakemake@input[['classify']])
 agg <- ParseOTUTable(classify_report) %>%
   mutate(SampleID = str_replace(SampleID, '^X', '')) %>%
   mutate(SampleID = str_replace(SampleID, '.taxa$', ''))
-phyla.hmap.dat <- MakeHeatmapData(agg, yaxis="Phylum", min.samples = max(1, n_samples*0.2))
-phyla.to.keep <- filter_taxon(phyla.hmap.dat)
-phyla.hmap <- ggplot(phyla.hmap.dat %>% filter(MinRank %in% phyla.to.keep), aes(SampleID, MinRank, fill=log10(count))) +
+phyla.hmap.dat <- MakeHeatmapData(agg, yaxis="Phylum", min.samples = max(1, n_samples*0.2)) %>%
+  filter_taxon()
+phyla.hmap <- phyla.hmap.dat %>%
+  ggplot(aes(SampleID, MinRank, fill=log10(count))) +
   geom_tile(color="grey80", size=0.4) +
   viridis::scale_fill_viridis(na.value="white", option = "A", labels=function(x) 10^(as.numeric(x))) +
   theme_classic() +
@@ -305,15 +286,14 @@ phyla.hmap <- ggplot(phyla.hmap.dat %>% filter(MinRank %in% phyla.to.keep), aes(
     y="Resolved taxonomic rank",
     fill="Read counts"
   )
+phyla.dims <- list(
+  ncols = length(unique(phyla.hmap.dat$SampleID)),
+  nrows = length(unique(phyla.hmap.dat$MinRank)))
 
-phyla.dims <- eval(heatmap_dims(phyla.hmap))
-p.height <- max(1.5+0.1*phyla.dims$nrows, 5)
-p.width <- max(2.5+0.2*phyla.dims$ncols, 5)
-test <- 5
-
-family.hmap.dat <- MakeHeatmapData(agg, yaxis="Family", min.samples = max(1, n_samples*0.2))
-family.to.keep <- filter_taxon(family.hmap.dat)
-family.hmap <- ggplot(family.hmap.dat %>% filter(MinRank %in% family.to.keep), aes(SampleID, MinRank, fill=log10(count))) +
+family.hmap.dat <- MakeHeatmapData(agg, yaxis="Family", min.samples = max(1, n_samples*0.2)) %>%
+  filter_taxon()
+family.hmap <- family.hmap.dat %>%
+  ggplot(aes(SampleID, MinRank, fill=log10(count))) +
   geom_tile(color="grey80", size=0.4) +
   viridis::scale_fill_viridis(na.value="white", option = "A", labels=function(x) 10^(as.numeric(x))) +
   theme_classic() +
@@ -329,11 +309,14 @@ family.hmap <- ggplot(family.hmap.dat %>% filter(MinRank %in% family.to.keep), a
     y="Resolved taxonomic rank",
     fill="Read counts"
   )
-family.dims <- heatmap_dims(family.hmap)
+family.dims <- list(
+  ncols = length(unique(family.hmap.dat$SampleID)),
+  nrows = length(unique(family.hmap.dat$MinRank)))
 
-genera.hmap.dat <- MakeHeatmapData(agg, yaxis="Genus", min.samples = max(1, n_samples*0.2))
-genera.to.keep <- filter_taxon(genera.hmap.dat, 50)
-genera.hmap <- ggplot(genera.hmap.dat %>% filter(MinRank %in% genera.to.keep), aes(SampleID, MinRank, fill=log10(count))) +
+genera.hmap.dat <- MakeHeatmapData(agg, yaxis="Genus", min.samples = max(1, n_samples*0.2)) %>%
+  filter_taxon(50)
+genera.hmap <- genera.hmap.dat %>%
+  ggplot(aes(SampleID, MinRank, fill=log10(count))) +
   geom_tile(color="grey80", size=0.4) +
   viridis::scale_fill_viridis(na.value="white", option = "A", labels=function(x) 10^(as.numeric(x))) +
   theme_classic() +
@@ -348,10 +331,14 @@ genera.hmap <- ggplot(genera.hmap.dat %>% filter(MinRank %in% genera.to.keep), a
     y="Resolved taxonomic rank",
     fill="Read counts"
   )
-genera.dims <- heatmap_dims(genera.hmap)
-species.hmap.dat <- MakeHeatmapData(agg, yaxis="Species", min.samples=0)
-species.to.keep <- filter_taxon(species.hmap.dat, 50)
-species.hmap <- ggplot(species.hmap.dat %>% filter(MinRank %in% species.to.keep), aes(SampleID, MinRank, fill=log10(count))) +
+genera.dims <- list(
+  ncols = length(unique(genera.hmap.dat$SampleID)),
+  nrows = length(unique(genera.hmap.dat$MinRank)))
+
+species.hmap.dat <- MakeHeatmapData(agg, yaxis="Species", min.samples=0) %>%
+  filter_taxon(50)
+species.hmap <- species.hmap.dat %>%
+  ggplot(aes(SampleID, MinRank, fill=log10(count))) +
   geom_tile(color="grey80", size=0.4) +
   viridis::scale_fill_viridis(na.value="white", option = "A", labels=function(x) 10^(as.numeric(x))) +
   theme_classic() +
@@ -366,7 +353,9 @@ species.hmap <- ggplot(species.hmap.dat %>% filter(MinRank %in% species.to.keep)
     y="Resolved taxonomic rank",
     fill="Read counts"
   )
-species.dims <- heatmap_dims(species.hmap)
+species.dims <- list(
+  ncols = length(unique(species.hmap.dat$SampleID)),
+  nrows = length(unique(species.hmap.dat$MinRank)))
 
 ```
 
@@ -378,7 +367,7 @@ Showing taxa at the phyla level or higher that appear in at least `r max(1, n_sa
 ```{r phyla-heatmap, fig.height=1.5+0.1*phyla.dims$nrows, fig.width=2.5+0.2*phyla.dims$ncols, results='asis'}
 save.image(file="debug.RData")
 if (nrow(phyla.hmap.dat) > 0) {
-  plot(make_square(phyla.hmap))  
+  plot(make_square(phyla.hmap, phyla.dims))
 } else {
   cat("**No phyla present in requisite number of samples**")
 }
@@ -392,7 +381,7 @@ Showing taxa at the family level or higher that appear in at least `r max(1, n_s
 ```{r family-heatmap, fig.height=1.5+0.1*family.dims$nrows, fig.width=2.5+0.2*family.dims$ncols, results='asis'}
 save.image(file="debug.RData")
 if (nrow(family.hmap.dat) > 0) {
-  plot(make_square(family.hmap))  
+  plot(make_square(family.hmap, family.dims))
 } else {
   cat("**No phyla present in requisite number of samples**")
 }
@@ -404,7 +393,7 @@ Showing taxa at the genus level or higher that appear in at least `r max(1, n_sa
 
 ```{r genera-heatmap, fig.height=1.5+0.1*genera.dims$nrows, fig.width=2.5+0.2*genera.dims$ncols, results='asis'}
 if (nrow(genera.hmap.dat) > 0) {
-  plot(make_square(genera.hmap))  
+  plot(make_square(genera.hmap, genera.dims))
 } else {
   cat("**No genera present in requisite number of samples**")
 }
@@ -416,7 +405,7 @@ Showing all species level annotations for all samples. Warning: this plot can be
 
 ```{r species-heatmap, fig.height=4+0.1*species.dims$nrows, fig.width=4.5+0.2*species.dims$ncols, results='asis'}
 if (nrow(species.hmap.dat) > 0) {
-  plot(make_square(species.hmap))  
+  plot(make_square(species.hmap, species.dims))
 } else {
   cat("**No species present in samples**")
 }
