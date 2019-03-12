@@ -5,5 +5,7 @@ rule final_report:
         classify=str(CLASSIFY_FP/'kraken'/'all_samples.tsv')
     output:
         str(Cfg['all']['output_fp']/'reports/final_report.html')
+    conda:
+        "sbx_report_env.yml"
     script:
         sunbeam_dir + '/extensions/sbx_report/final_report.Rmd'
